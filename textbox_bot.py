@@ -315,24 +315,24 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         if font_type.lower() == "charlie":
             font_path = os.path.join(fonts_dir, "clarkie.ttf")
         else:
-            # Maga uses system Impact font
-            impact_paths = [
-                "/System/Library/Fonts/Supplemental/Impact.ttf",
-                "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-                "/usr/share/fonts/Impact.ttf",
-                "C:\\Windows\\Fonts\\impact.ttf",
-            ]
+            # Try local fonts directory first for maga.ttf or impact.ttf
             font_path = None
-            for ip in impact_paths:
-                if os.path.exists(ip):
-                    font_path = ip
+            for name in ("maga.ttf", "impact.ttf"):
+                local_impact = os.path.join(fonts_dir, name)
+                if os.path.exists(local_impact):
+                    font_path = local_impact
                     break
             if font_path is None:
-                # Fallback: check fonts dir for a downloaded Impact or maga.ttf
-                for name in ("impact.ttf", "maga.ttf"):
-                    local_impact = os.path.join(fonts_dir, name)
-                    if os.path.exists(local_impact):
-                        font_path = local_impact
+                # Fallback to system paths if local is missing
+                impact_paths = [
+                    "/System/Library/Fonts/Supplemental/Impact.ttf",
+                    "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
+                    "/usr/share/fonts/Impact.ttf",
+                    "C:\\Windows\\Fonts\\impact.ttf",
+                ]
+                for ip in impact_paths:
+                    if os.path.exists(ip):
+                        font_path = ip
                         break
     else:
         font_path = os.path.join(fonts_dir, f"{font_type.lower()}.ttf")
