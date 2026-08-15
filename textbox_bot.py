@@ -407,7 +407,7 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         
     # Calculate box height
     if is_maga:
-        line_spacing_multiplier = 0.70
+        line_spacing_multiplier = 0.75
     else:
         line_spacing_multiplier = 0.70
     total_text_height = 0
