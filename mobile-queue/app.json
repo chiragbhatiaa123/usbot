@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "mobile-queue",
+    "slug": "mobile-queue",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "templatea-queue",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.templatea.queue"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.templatea.queue",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          }
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "android": {
+            "intentFilters": [
+              {
+                "action": "android.intent.action.SEND",
+                "data": {
+                  "mimeType": "text/plain"
+                }
+              }
+            ]
+          },
+          "ios": {
+            "activationRules": {
+              "NSExtensionActivationSupportsText": true,
+              "NSExtensionActivationSupportsWebURLWithMaxCount": 1
+            }
+          }
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "11a84147-bb36-4c60-82b7-3c597833e594"
+      }
+    }
+  }
+}

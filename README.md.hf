@@ -1,0 +1,87 @@
+# How to Deploy your Telegram Bot to Hugging Face Spaces 24/7 (For Free)
+
+Follow these steps to host `textbox_bot.py` (or `telegram_bot.py`) on a free Hugging Face Space and keep it online 24/7 without any costs.
+
+---
+
+## Step 1: Create a Hugging Face Account & Space
+1. Sign up or log in at [Hugging Face](https://huggingface.co/).
+2. Click on your profile icon in the top right and select **New Space** (or go directly to [huggingface.co/new-space](https://huggingface.co/new-space)).
+3. Fill in the details:
+   - **Space Owner**: Your username.
+   - **Space Name**: e.g., `telegram-textbox-bot` (or any name you prefer).
+   - **License**: Choose any (e.g., `mit` or leave blank).
+   - **Select the Space SDK**: **Docker**.
+   - **Docker Template**: **Blank**.
+   - **Space Hardware**: **CPU basic • 2 vCPU • 16 GB • Free**.
+   - **Visibility**: **Private** (recommended, so your Space's public URL/interface isn't searchable, though Public works fine too).
+4. Click **Create Space**.
+
+---
+
+## Step 2: Configure Environment Secrets
+Since we don't want to upload your sensitive API keys and tokens to git/code repositories, configure them as Space secrets:
+1. In your new Space, click on the **Settings** tab (near the top right).
+2. Scroll down to the **Variables and secrets** section.
+3. Click **New secret** for each of the following variables:
+   - Name: `TELEGRAM_BOT_TOKEN` | Value: *[Your Telegram Bot Token]*
+   - Name: `GEMINI_API_KEY` | Value: *[Your Gemini API Key]*
+   - Name: `GROQ_API_KEY` | Value: *[Your Groq API Key]*
+   - Name: `PERPLEXITY_API_KEY` | Value: *[Your Perplexity API Key]*
+   - Name: `OPENAI_API_KEY` | Value: *[Your OpenAI API Key]*
+   - Name: `API_KEY` | Value: `Taylor`
+
+---
+
+## Step 3: Upload the Bot Code to Hugging Face
+You can push your files using standard Git commands, or upload them directly using the Hugging Face web interface:
+
+### Option A: Upload via Web Interface (Easiest)
+1. Go to the **Files** tab of your Space.
+2. Click **Add file** -> **Upload files**.
+3. Drag and drop the following files/folders:
+   - `textbox_bot.py`
+   - `requirements.txt`
+   - `fonts/` (if you have custom fonts, though the bot downloads them automatically on first run)
+4. Upload `Dockerfile.hf` but **rename it to `Dockerfile`** when uploading so Hugging Face recognizes it.
+5. Click **Commit changes to main**.
+
+### Option B: Push via Git (Recommended for updates)
+Run these commands from your local computer:
+```bash
+# Initialize git if you haven't already
+git init
+
+# Add the Hugging Face Space repository as a remote
+git remote add hf https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
+
+# Rename or copy Dockerfile.hf to Dockerfile
+cp Dockerfile.hf Dockerfile
+
+# Add files and commit
+git add textbox_bot.py requirements.txt Dockerfile fonts/
+git commit -m "Deploy telegram bot to HF Space"
+
+# Push to Hugging Face (you might need to generate an Access Token in Hugging Face settings to use as your password)
+git push -f hf main
+```
+
+Once pushed, Hugging Face will automatically start building the Docker image. You can see the build logs on your Space's page.
+
+---
+
+## Step 4: Keep the Bot Awake 24/7 using UptimeRobot
+Hugging Face Spaces on the free tier automatically "sleep" (pause) if they don't receive web traffic for 48 hours. Since your Telegram bot communicates via polling, it doesn't receive external web requests, so it will sleep unless we ping its dummy web server.
+
+1. Go to your Hugging Face Space page.
+2. Click the three dots icon `...` in the top right and click **Embed this Space**.
+3. Look for the **Direct URL** or **Space URL** (it looks like `https://username-space-name.hf.space`). Copy this URL.
+4. Go to [UptimeRobot](https://uptimerobot.com/) and create a free account.
+5. Click **Add New Monitor**:
+   - **Monitor Type**: `HTTPS`
+   - **Friendly Name**: `Telegram Bot Keeper`
+   - **URL (or IP)**: `https://YOUR_USERNAME-YOUR_SPACE_NAME.hf.space` (paste the URL you copied)
+   - **Monitoring Interval**: `30 minutes`
+6. Click **Create Monitor**.
+
+Now, UptimeRobot will ping your Space's dummy web server (running on port `7860`) every 30 minutes. This keeps the container active indefinitely, ensuring your Telegram bot remains active 24/7!

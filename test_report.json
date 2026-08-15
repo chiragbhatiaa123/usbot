@@ -1,0 +1,22 @@
+[
+  {
+    "video": "E:\\Code\\Templatea\\workspace\\DMIkpsfN-Un\\00_raw\\raw_source.mp4",
+    "text": "You'll regret skipping this! 😂",
+    "status": "success",
+    "caption_source": "ocr",
+    "manual_caption_file": null,
+    "manual_caption": null,
+    "ocr_caption": "You'll regret skipping this! 😂",
+    "effective_caption": "You'll regret skipping this! 😂",
+    "ai_copy_status": "success",
+    "ai_recommended_copies": [
+      "Don't miss out—regret is optional, but fun isn't!",
+      "Skip this and you'll be sorry—laughs guaranteed!",
+      "Regret skipping? Not if you watch now—fun awaits!"
+    ],
+    "ai_copy_source": "groq_direct",
+    "ai_validation_notes": [
+      "Groq direct generation successful"
+    ]
+  }
+]

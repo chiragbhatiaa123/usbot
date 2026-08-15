@@ -1,0 +1,49 @@
+{
+    "id": "marketing_spots",
+    "name": "Marketing Spots",
+    "canvas": {
+        "width": 1080,
+        "height": 1920
+    },
+    "background": {
+        "type": "image",
+        "value": "assets/spots.png"
+    },
+    "video": {
+        "width_pct": 80,
+        "position": {
+            "x": 540,
+            "y": 960
+        },
+        "rounded_radius": 50,
+        "stroke_width": 10,
+        "stroke_color": "#ef0404"
+    },
+    "top_text": {
+        "enabled": true,
+        "font": "assets/LeagueSpartan-Black.ttf",
+        "font_size": 55,
+        "min_font_size": 25,
+        "max_lines": 3,
+        "line_width_pct": 80,
+        "line_spacing_factor": 1.25,
+        "color": "#fcfafa",
+        "casing_mode": "upper",
+        "align": "center",
+        "gap_px": 50,
+        "highlight": {
+            "enabled": true,
+            "type": "fragmented",
+            "color": "#ef0404",
+            "hard_cap_pct": 20,
+            "target_pct": 15
+        }
+    },
+    "logo": {
+        "enabled": false
+    },
+    "renderer": {
+        "module": "templates.marketing_spots",
+        "entrypoint": "render"
+    }
+}

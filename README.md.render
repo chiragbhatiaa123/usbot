@@ -1,0 +1,65 @@
+# How to Deploy your Telegram Bot to Render 24/7 (For Free)
+
+Follow these steps to host `textbox_bot.py` on Render's free tier and keep it online 24/7 using UptimeRobot (no credit card required).
+
+---
+
+## Step 1: Push your Code to GitHub
+Render deploys apps directly from a GitHub repository.
+1. Create a new private (or public) repository on GitHub.
+2. Push your bot repository to GitHub:
+   ```bash
+   git init
+   git add .
+   # Copy or rename Dockerfile.render to Dockerfile in the root of your repo
+   cp Dockerfile.render Dockerfile
+   git add Dockerfile
+   git commit -m "Configure bot for Render deployment"
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git push -u origin main
+   ```
+
+---
+
+## Step 2: Create a Render Web Service
+1. Sign up or log in at [Render](https://render.com/). (No credit card is required for the free tier!)
+2. In the dashboard, click **New +** and select **Web Service**.
+3. Connect your GitHub account and select your bot repository.
+4. Fill in the details:
+   - **Name**: `telegram-textbox-bot` (or any name you prefer)
+   - **Language**: **Docker** (Render will automatically look for the `Dockerfile` we set up)
+   - **Region**: Select the region closest to you (e.g., Oregon or Frankfurt)
+   - **Branch**: `main`
+   - **Instance Type**: **Free** (0.15 vCPU, 512 MB RAM)
+5. Scroll down and click **Deploy Web Service**.
+
+---
+
+## Step 3: Configure Environment Secrets on Render
+We must define your `.env` variables in the Render settings so they are not hardcoded:
+1. In your Render Web Service page, go to the **Environment** tab on the left sidebar.
+2. Click **Add Environment Variable** and enter the following keys and values from your local `.env`:
+   - `TELEGRAM_BOT_TOKEN`
+   - `GEMINI_API_KEY`
+   - `GROQ_API_KEY`
+   - `PERPLEXITY_API_KEY`
+   - `OPENAI_API_KEY`
+   - `API_KEY` (set to `Taylor`)
+3. Click **Save Changes**. Render will automatically redeploy the bot with these credentials.
+
+---
+
+## Step 4: Keep the Bot Awake 24/7 using UptimeRobot
+Render's free tier web services spin down (go to sleep) if they do not receive HTTP requests for 15 minutes. To prevent this and keep your bot online 24/7, we will use a free pinging service.
+
+1. Once your Render Web Service completes deployment, copy the public URL at the top left of the dashboard page (it looks like `https://telegram-textbox-bot.onrender.com`).
+2. Go to [UptimeRobot](https://uptimerobot.com/) and create a free account.
+3. Click **Add New Monitor**:
+   - **Monitor Type**: `HTTPS`
+   - **Friendly Name**: `Render Telegram Bot`
+   - **URL (or IP)**: `https://YOUR_APP_NAME.onrender.com` (paste your Render URL)
+   - **Monitoring Interval**: `5 minutes` (this ensures it pings well before the 15-minute timeout)
+4. Click **Create Monitor**.
+
+UptimeRobot will now ping your Render web service every 5 minutes, preventing it from ever spinning down and ensuring your Telegram bot remains active 24/7!

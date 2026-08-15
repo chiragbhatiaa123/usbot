@@ -1,0 +1,32 @@
+# Create/overwrite .gitignore
+__pycache__/
+*.py[cod]
+*.log 
+.env 
+.venv/
+venv/ 
+.idea/ 
+.vscode/ 
+*.sqlite3 
+*.DS_Store 
+coverage/ 
+.pytest_cache/
+dist/
+build/ > .gitignore
+frontend/
+frontend-react-native/
+frontend-react-native-v/
+.env
+workspace/
+tests/
+OutputTest/
+python_libs/
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.rar
+service-account.json
+db/
+*.db
+*.sqlite

@@ -1,0 +1,49 @@
+{
+  "id": "startupsbyindian",
+  "name": "Startups By Indian",
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "background": {
+    "type": "image",
+    "value": "assets/background.png"
+  },
+  "video": {
+    "width_pct": 80,
+    "position": {
+      "x": 540,
+      "y": 960
+    },
+    "rounded_radius": 50,
+    "stroke_width": 10,
+    "stroke_color": "#03d97f"
+  },
+  "top_text": {
+    "enabled": true,
+    "font": "assets/Poppins-Bold.ttf",
+    "font_size": 52,
+    "min_font_size": 25,
+    "max_lines": 3,
+    "line_width_pct": 88,
+    "line_spacing_factor": 1.25,
+    "color": "#eef0ef",
+    "casing_mode": "upper",
+    "align": "center",
+    "gap_px": 50,
+    "highlight": {
+      "enabled": true,
+      "type": "fragmented",
+      "color": "#03d97f",
+      "hard_cap_pct": 50,
+      "target_pct": 40
+    }
+  },
+  "logo": {
+    "enabled": false
+  },
+  "renderer": {
+    "module": "templates.StartupsbyIndian",
+    "entrypoint": "render"
+  }
+}

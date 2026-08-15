@@ -1,0 +1,61 @@
+{
+    "id": "LOM",
+    "renderer" :{
+    "module": "templates.LOM",
+    "entrypoint": "process_lom_template"},
+    "description": "Legend Of Marketing template with bold captions.",
+
+    "name": "Legend Of Marketing",
+    "canvas": { 
+      "width": 1080, 
+      "height": 1920 
+    },
+    "background": {
+      "type": "color",
+      "value": "#f5f5f5"
+    },
+    "video": {
+      "width_pct": 100,
+      "vertical_align": "center"
+    },
+    "text": {
+      "font": "./assets/Anton.ttf",
+      "line_spacing_factor": 0.75,
+      "font_size": 62,
+      "min_font_size": 40,
+      "max_lines": 2,
+      "line_width_pct": 90,
+      "position_relative_to_video": { 
+        "gap_px": 40 
+      },
+      "color": "#000000",
+      "align": "center",
+      "highlight": {
+        "enabled": false,
+        "mode": "ai",
+        "manual_words": [
+          "Throwback",
+          "AI-powered",
+          "arriving"
+        ],
+        "highlight_count": 1,
+        "default_highlight_color": "#e762bd"
+      }
+    },
+    "logo": {
+      "enabled": false,
+      "path": "assets/marketingspots_logo.png",
+      "size": { 
+        "width": 100
+      },
+      "position": "top-right",
+      "margin": 50
+    },
+    "render": {
+      "audio_merge": true,
+      "ffmpeg_params": "-c:v libx264 -crf 18 -preset veryfast"
+    },
+
+    "text.casing_mode": "upper",
+    "text.line_spacing_factor" : 0.75
+  }

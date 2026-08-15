@@ -1,0 +1,35 @@
+# Dockerfile for running Telegram Bot on Hugging Face Spaces
+FROM python:3.11-slim
+
+# Prevent Python from buffering stdout/stderr and generating .pyc files
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        curl \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up work directory
+WORKDIR /app
+
+# Copy requirements.txt and install python dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all project files into the container
+COPY . .
+
+# Create necessary runtime directories and set permissions
+RUN mkdir -p /app/fonts /app/db /app/workspace && chmod -R 777 /app
+
+# Hugging Face Spaces require the application to listen on port 7860
+EXPOSE 7860
+
+# Run the textbox_bot by default
+CMD ["python", "textbox_bot.py"]

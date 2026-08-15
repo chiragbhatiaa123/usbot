@@ -1,0 +1,10 @@
+2025-11-22 12:58:31,292 INFO Starting render - input: workspace\DRRrxPliKix\00_raw\raw_source.mp4
+2025-11-22 12:58:31,292 INFO Input video size: 4.61 MB
+2025-11-22 12:58:31,292 INFO Background image path: templates\marketing_spots\assets\spots.png (Absolute: E:\Code\Templatea\templates\marketing_spots\assets\spots.png)
+2025-11-22 12:58:31,292 INFO Background image found, loading...
+2025-11-22 12:58:31,450 INFO Input video dimensions: 720x1280
+2025-11-22 12:58:31,462 DEBUG Video box: vx=108, vy=243, vw=864, vh=1536
+2025-11-22 12:58:31,462 DEBUG _render_text_block: position=top, text='DEBUG FIXED'
+2025-11-22 12:58:31,774 DEBUG FFmpeg command:
+ffmpeg -y -hide_banner -loglevel warning -loop 1 -f image2pipe -vcodec png -i pipe:0 -i 'workspace\DRRrxPliKix\00_raw\raw_source.mp4' -filter_complex '[0:v]loop=-1:size=1:start=0,setpts=N/FRAME_RATE/TB[bg];[1:v]scale=864:1536,format=rgba[vid0];movie='"'"'E\:/Code/Templatea/__video_assets/mask_864x1536_r50.png'"'"',format=rgba[mask1];[vid0][mask1]alphamerge[vid2];[bg][vid2]overlay=108:243:format=yuv420:shortest=1[base3];[base3]copy[outv]' -map '[outv]' -map '1:a?' -c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p -movflags +faststart -c:a aac test_debug_fixed.mp4
+2025-11-22 12:58:46,331 INFO Render completed successfully (single-pass, final video saved).

@@ -1,0 +1,23 @@
+"""
+highlight_api.py
+
+Small pluggable module to select words for highlighting.
+Replace select_highlight_words with a call to your AI service (Gemini/Groq/etc.)
+"""
+
+from typing import List
+
+def select_highlight_words(text: str, top_k: int = 3) -> List[str]:
+    """
+    Default heuristic: return top_k longest distinct words (good baseline).
+    Replace this implementation with a call to your AI scoring model.
+    """
+    words = [w.strip(".,!?:;\"'()[]{}") for w in text.split()]
+    words = [w for w in words if len(w) > 2]
+    unique = []
+    for w in words:
+        lw = w.lower()
+        if lw not in unique:
+            unique.append(lw)
+    unique.sort(key=lambda w: -len(w))
+    return unique[:top_k]

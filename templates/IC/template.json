@@ -1,0 +1,66 @@
+{
+  "id": "IC",
+  "name": "IC",
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "background": {
+    "type": "image",
+    "value": "assets/background.png"
+  },
+  "video": {
+    "width_pct": 75,
+    "position": {
+      "y": 960
+    },
+    "rounded_radius": 50
+  },
+  "top_text": {
+    "enabled": false
+  },
+  "bottom_text": {
+    "enabled": true,
+    "font": "assets/CooperLtBT-Bold.ttf",
+    "font_size": 51,
+    "min_font_size": 30,
+    "max_lines": 3,
+    "line_width_pct": 75,
+    "line_spacing_factor": 1.3,
+    "color": "#e5404a",
+    "casing_mode": "sentence",
+    "align": "center",
+    "gap_px": 200,
+    "highlight": {
+      "enabled": false,
+      "type": "color_word",
+      "mode": "ai",
+      "highlight_count": 1,
+      "manual_words": [
+        "incredible",
+        "amazing"
+      ],
+      "color": "#00ff00"
+    }
+  },
+  "header": {
+    "enabled": false,
+    "path": "assets/header.png",
+    "width": 600,
+    "gap_px": 25
+  },
+  "logo": {
+    "enabled": true,
+    "path": "assets/logo.png",
+    "size": {
+      "width": 200
+    },
+    "position_mode": "canvas",
+    "position": "top-left",
+    "margin": 20
+    },
+  "renderer": {
+    "module": "templates.IC",
+    "entrypoint": "render"
+  }
+}

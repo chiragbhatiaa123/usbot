@@ -1,0 +1,41 @@
+{
+  "id": "fullframe_smart",
+  "name": "Full Frame Smart",
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "background": {
+    "type": "color",
+    "value": "#000000"
+  },
+  "video": {
+    "fit_mode": "cover",
+    "position": {
+      "x": 540,
+      "y": 960
+    }
+  },
+  "top_text": {
+    "enabled": true,
+    "placement_mode": "absolute",
+    "anchor": "bottom",
+    "offset": 100,
+    "font": "assets/CooperLtBT-Bold.ttf",
+    "font_size": 51,
+    "min_font_size": 32,
+    "max_lines": 3,
+    "line_width_pct": 70,
+    "line_spacing_factor": 1.2,
+    "color": "#e5404a",
+    "align": "center",
+    "highlight": {
+      "enabled": false
+    }
+  },
+  "renderer": {
+    "module": "templates.FullFrameSmart",
+    "entrypoint": "render"
+  }
+}
+
