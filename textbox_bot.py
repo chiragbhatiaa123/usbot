@@ -312,25 +312,28 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
     # Find matching font
     fonts_dir = os.path.join(BASE_DIR, "fonts")
     if is_maga:
-        # Maga uses system Impact font
-        impact_paths = [
-            "/System/Library/Fonts/Supplemental/Impact.ttf",
-            "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
-            "/usr/share/fonts/Impact.ttf",
-            "C:\\Windows\\Fonts\\impact.ttf",
-        ]
-        font_path = None
-        for ip in impact_paths:
-            if os.path.exists(ip):
-                font_path = ip
-                break
-        if font_path is None:
-            # Fallback: check fonts dir for a downloaded Impact or maga.ttf
-            for name in ("impact.ttf", "maga.ttf"):
-                local_impact = os.path.join(fonts_dir, name)
-                if os.path.exists(local_impact):
-                    font_path = local_impact
+        if font_type.lower() == "charlie":
+            font_path = os.path.join(fonts_dir, "clarkie.ttf")
+        else:
+            # Maga uses system Impact font
+            impact_paths = [
+                "/System/Library/Fonts/Supplemental/Impact.ttf",
+                "/usr/share/fonts/truetype/msttcorefonts/Impact.ttf",
+                "/usr/share/fonts/Impact.ttf",
+                "C:\\Windows\\Fonts\\impact.ttf",
+            ]
+            font_path = None
+            for ip in impact_paths:
+                if os.path.exists(ip):
+                    font_path = ip
                     break
+            if font_path is None:
+                # Fallback: check fonts dir for a downloaded Impact or maga.ttf
+                for name in ("impact.ttf", "maga.ttf"):
+                    local_impact = os.path.join(fonts_dir, name)
+                    if os.path.exists(local_impact):
+                        font_path = local_impact
+                        break
     else:
         font_path = os.path.join(fonts_dir, f"{font_type.lower()}.ttf")
     
@@ -406,7 +409,12 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         line_bboxes.append(bbox)
         
     # Calculate box height
-    line_spacing_multiplier = 0.75 if is_maga else 0.70
+    if font_type.lower() == "charlie":
+        line_spacing_multiplier = 0.60
+    elif is_maga:
+        line_spacing_multiplier = 0.75
+    else:
+        line_spacing_multiplier = 0.70
     total_text_height = 0
     first_line_top_offset = 0
     if num_lines > 0:
