@@ -253,7 +253,7 @@ def call_ocr_space(image_bytes: bytes) -> str:
         logger.error(f"OCR.space request failed: {e}")
     return ""
 
-def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "yellow", user_support_image_path: str = None) -> BytesIO:
+def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "yellow", user_support_image_path: str = None, doge_highlight_lines: int = None) -> BytesIO:
     """Generates the premium text box image as a PNG bytes buffer."""
     # Image Canvas Dimensions
     canvas_w = 1080
@@ -274,13 +274,22 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         lines = ["TEXT BOX"]
         
     num_lines = len(lines)
-    is_maga = font_type.lower() in ("maga", "charlie", "maga_charlie")
+    is_maga = font_type.lower() in ("maga", "charlie", "maga_charlie", "doge")
     
     # Assign colors:
+    # For doge: color the last k lines based on user choice
     # For maga/charlie: middle lines are colored (5 lines → middle 3, 4 lines → middle 2)
     # For faith: last lines are colored (<=4 → last 2, >=5 → last 3)
     line_colors = []
-    if is_maga:
+    if font_type.lower() == "doge":
+        k = doge_highlight_lines if doge_highlight_lines is not None else 2
+        k = min(num_lines, max(0, k))
+        for idx in range(num_lines):
+            if idx >= num_lines - k:
+                line_colors.append(highlight_color)
+            else:
+                line_colors.append(default_text_color)
+    elif font_type.lower() in ("maga", "charlie", "maga_charlie"):
         # Maga: color the middle lines
         if num_lines <= 4:
             num_colored = 2
@@ -311,7 +320,9 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
                 
     # Find matching font
     fonts_dir = os.path.join(BASE_DIR, "fonts")
-    if is_maga:
+    if font_type.lower() == "doge":
+        font_path = os.path.join(fonts_dir, "league_gothic.ttf")
+    elif font_type.lower() in ("maga", "charlie", "maga_charlie"):
         # Both Maga and Charlie styles use the Impact font (impact.ttf)
         font_path = None
         for name in ("impact.ttf", "maga.ttf"):
@@ -503,8 +514,8 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
     # Final output dimensions (4:5 ratio)
     canvas_h = 1350
     
-    # Generate background (transparent for maga/charlie/faith, solid black for others)
-    if font_type.lower() in ("maga", "charlie", "faith"):
+    # Generate background (transparent for maga/charlie/faith/doge, solid black for others)
+    if font_type.lower() in ("maga", "charlie", "faith", "doge"):
         bg_img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     else:
         bg_img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 255))
@@ -590,6 +601,9 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
     # Combine layers
     final_img = Image.alpha_composite(bg_img, box_overlay)
     
+    if font_type.lower() == "doge":
+        final_img = final_img.crop((0, box_y, canvas_w, box_y + box_height))
+        
     out_buf = BytesIO()
     final_img.save(out_buf, format="PNG")
     out_buf.seek(0)
@@ -850,6 +864,7 @@ STATE_WAITING_SHAPE_IMAGE = 5
 STATE_POSITIONING_SHAPE = 6
 STATE_CONFIRM_IG_OCR = 7
 STATE_WAITING_SHAPE2_IMAGE = 8
+STATE_WAITING_DOGE_HIGHLIGHT_LINES = 9
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entry point: Greet user and offer font styles."""
@@ -861,6 +876,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [
             InlineKeyboardButton("🇺🇸 Maga (Impact)", callback_data="font:maga"),
             InlineKeyboardButton("🇺🇸 Charlie (Impact)", callback_data="font:charlie")
+        ],
+        [
+            InlineKeyboardButton("🐕 Doge (League Gothic)", callback_data="font:doge")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -888,12 +906,13 @@ async def font_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         "faith": "Faith (Lilita One)",
         "maga": "Maga (Impact)",
         "charlie": "Charlie (Impact)",
-        "maga_charlie": "Maga/Charlie (Impact)"
+        "maga_charlie": "Maga/Charlie (Impact)",
+        "doge": "Doge (League Gothic)"
     }
     
     name = display_names.get(font_choice, font_choice)
     
-    if font_choice in ("maga", "charlie", "maga_charlie", "faith"):
+    if font_choice in ("maga", "charlie", "maga_charlie", "faith", "doge"):
         keyboard = [
             [
                 InlineKeyboardButton("🟡 Yellow (#ffde59)", callback_data="color:yellow"),
@@ -986,7 +1005,11 @@ async def change_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         status_msg = await query.message.reply_text("🎨 Re-rendering with new color...")
         try:
             user_support_image_path = context.user_data.get("user_support_image_path")
-            image_buffer, line_bottom = generate_textbox_image(last_text, font_choice, color_choice, user_support_image_path=user_support_image_path)
+            image_buffer, line_bottom = generate_textbox_image(
+                last_text, font_choice, color_choice,
+                user_support_image_path=user_support_image_path,
+                doge_highlight_lines=context.user_data.get("doge_highlight_lines")
+            )
             
             # Save transparent PNG bytes in session
             png_bytes = image_buffer.getvalue()
@@ -994,7 +1017,7 @@ async def change_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             context.user_data["line_bottom"] = line_bottom
             
             # Build post-render keyboard with color change + font change options
-            if font_choice in ("maga", "charlie", "maga_charlie", "faith"):
+            if font_choice in ("maga", "charlie", "maga_charlie", "faith", "doge"):
                 keyboard = [
                     [
                         InlineKeyboardButton("🟡 Yellow", callback_data="recolor:yellow"),
@@ -1083,6 +1106,9 @@ async def change_font(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         [
             InlineKeyboardButton("🇺🇸 Maga", callback_data="font:maga"),
             InlineKeyboardButton("🇺🇸 Charlie", callback_data="font:charlie")
+        ],
+        [
+            InlineKeyboardButton("🐕 Doge (League Gothic)", callback_data="font:doge")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1246,6 +1272,15 @@ async def text_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             return STATE_WAITING_TEXT
             
     # Non-Instagram regular rendering path
+    if font_choice == "doge":
+        context.user_data["doge_highlight_lines"] = None
+        context.user_data["doge_pending_text"] = text
+        await update.message.reply_text(
+            "🖍️ **How many lines would you like to highlight/color?**\n\n"
+            "Send a number (e.g. 1, 2, 3, etc.):"
+        )
+        return STATE_WAITING_DOGE_HIGHLIGHT_LINES
+        
     status_msg = await update.message.reply_text("🎨 Checking grammar & rendering, please wait...")
     
     # AI Proofreading check
@@ -1330,6 +1365,122 @@ async def text_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 caption=caption_text,
                 reply_markup=reply_markup
             )
+            
+        await status_msg.delete()
+        
+        # Send proofreading suggestion if corrections found
+        if has_corrections:
+            context.user_data["suggested_corrected_text"] = corrected_text
+            kb = [
+                [
+                    InlineKeyboardButton("✅ Use Corrected Text", callback_data="proofread:accept"),
+                    InlineKeyboardButton("❌ Keep Original", callback_data="proofread:ignore")
+                ]
+            ]
+            markup = InlineKeyboardMarkup(kb)
+            await update.message.reply_text(
+                f"📝 **AI Proofreading Suggestion:**\n"
+                f"I detected some spelling or grammar errors.\n\n"
+                f"**Suggested Correction:**\n"
+                f"`{corrected_text}`\n\n"
+                f"Would you like to switch to this version?",
+                reply_markup=markup,
+                parse_mode="Markdown"
+            )
+        await update.message.reply_text(
+            "🖼️ **Would you like to overlay this text box on top of a background image or video?**\n\n"
+            "📥 **Send an image or a video now** to blend it,\n"
+            "➡️ Or click/type /skip to keep the transparent PNG layout and send new text."
+        )
+        return STATE_WAITING_BACKGROUND
+        
+    except Exception as e:
+        logger.error(f"Failed to generate/send image: {e}")
+        await status_msg.edit_text(f"❌ Sorry, an error occurred during rendering: {str(e)}")
+        return STATE_WAITING_TEXT
+
+async def doge_highlight_lines_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle receiving number of lines to color for Doge style."""
+    num_lines_text = update.message.text.strip()
+    try:
+        num_lines = int(num_lines_text)
+        if num_lines < 0:
+            raise ValueError()
+    except ValueError:
+        await update.message.reply_text("⚠️ Please send a valid positive number (e.g. 1, 2, 3):")
+        return STATE_WAITING_DOGE_HIGHLIGHT_LINES
+
+    context.user_data["doge_highlight_lines"] = num_lines
+    text = context.user_data.get("doge_pending_text", "")
+    
+    # Clear the pending text
+    context.user_data.pop("doge_pending_text", None)
+    
+    status_msg = await update.message.reply_text("🎨 Checking grammar & rendering, please wait...")
+    
+    # AI Proofreading check
+    corrected_text = proofread_text_with_ai(text)
+    has_corrections = (corrected_text.upper().strip() != text.upper().strip())
+    
+    # Store the last text so color change can re-render
+    context.user_data["last_text"] = text
+    font_choice = "doge"
+    color_choice = context.user_data.get("chosen_color", "yellow")
+    
+    try:
+        user_support_image_path = context.user_data.get("user_support_image_path")
+        image_buffer, line_bottom = generate_textbox_image(
+            text, font_choice, color_choice,
+            user_support_image_path=user_support_image_path,
+            doge_highlight_lines=num_lines
+        )
+        
+        # Save transparent PNG bytes in session
+        png_bytes = image_buffer.getvalue()
+        context.user_data["transparent_png_bytes"] = png_bytes
+        context.user_data["line_bottom"] = line_bottom
+        
+        color_names = {
+            "yellow": "🟡 Yellow",
+            "red": "🔴 Red",
+            "orange": "🟠 Orange",
+            "magenta": "🟣 Magenta",
+            "green": "🟢 Green",
+            "blue": "🔵 Blue",
+            "purple": "🟪 Purple"
+        }
+        color_name = color_names.get(color_choice, color_choice.capitalize())
+        
+        # Build post-render keyboard
+        keyboard = [
+            [
+                InlineKeyboardButton("🟡 Yellow", callback_data="recolor:yellow"),
+                InlineKeyboardButton("🔴 Red", callback_data="recolor:red")
+            ],
+            [
+                InlineKeyboardButton("🟠 Orange", callback_data="recolor:orange"),
+                InlineKeyboardButton("🟣 Magenta", callback_data="recolor:magenta")
+            ],
+            [
+                InlineKeyboardButton("🟢 Green", callback_data="recolor:green"),
+                InlineKeyboardButton("🔵 Blue", callback_data="recolor:blue")
+            ],
+            [
+                InlineKeyboardButton("🟪 Purple", callback_data="recolor:purple")
+            ],
+            [
+                InlineKeyboardButton("🔄 Change Font", callback_data="changefont")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        caption_text = f"✅ **Doge** transparent text box generated!"
+        image_buffer.name = "doge_textbox.png"
+        await update.message.reply_document(
+            document=image_buffer,
+            caption=caption_text,
+            reply_markup=reply_markup
+        )
             
         await status_msg.delete()
         
@@ -1653,7 +1804,9 @@ async def color_ocr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         user_support_image_path = context.user_data.get("user_support_image_path")
         image_buffer, line_bottom = generate_textbox_image(
-            text, font_choice, color_choice, user_support_image_path=user_support_image_path
+            text, font_choice, color_choice,
+            user_support_image_path=user_support_image_path,
+            doge_highlight_lines=context.user_data.get("doge_highlight_lines")
         )
         
         # Save transparent PNG bytes in session
@@ -1769,7 +1922,9 @@ async def proofread_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     status_msg = await query.message.reply_text("🎨 Re-rendering with corrected text...")
     try:
         image_buffer, line_bottom = generate_textbox_image(
-            corrected_text, font_choice, color_choice, user_support_image_path=user_support_image_path
+            corrected_text, font_choice, color_choice,
+            user_support_image_path=user_support_image_path,
+            doge_highlight_lines=context.user_data.get("doge_highlight_lines")
         )
         
         # Save transparent PNG bytes in session
@@ -2446,6 +2601,12 @@ def run_test_renders():
             "font": "maga",
             "color": "orange",
             "text": "MY FAMILY AND EVERYONE I\nKNOW IN PAKISTAN NO\nLONGER WANTS TO COME TO\nAMERICA THANKS TO TRUMP.\nPAKISTANIS ARE STAYING\nHOME!'- WAJAHAT ALI"
+        },
+        {
+            "name": "test_doge_6line.png",
+            "font": "doge",
+            "color": "yellow",
+            "text": "MY FAMILY AND EVERYONE I\nKNOW IN PAKISTAN NO\nLONGER WANTS TO COME TO\nAMERICA THANKS TO TRUMP.\nPAKISTANIS ARE STAYING\nHOME!'- WAJAHAT ALI"
         }
     ]
     
@@ -2531,6 +2692,11 @@ def main():
             STATE_WAITING_SHAPE2_IMAGE: [
                 MessageHandler(filters.PHOTO, shape2_image_received),
                 CallbackQueryHandler(shape_position_callback, pattern="^pos:")
+            ],
+            STATE_WAITING_DOGE_HIGHLIGHT_LINES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, doge_highlight_lines_received),
+                CallbackQueryHandler(change_color, pattern="^recolor:"),
+                CallbackQueryHandler(change_font, pattern="^changefont$"),
             ]
         },
         fallbacks=[CommandHandler("cancel", cancel), CommandHandler("restart", restart)],
