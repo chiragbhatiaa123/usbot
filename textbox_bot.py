@@ -26,9 +26,13 @@ import numpy as np
 from rembg import remove
 import requests
 import instaloader
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram.ext import ContextTypes
 # Load environment variables
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+import json
 
 # Logging setup
 logging.basicConfig(
@@ -36,6 +40,44 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 logger = logging.getLogger("textbox_bot")
+
+def save_user_session(user_id, chosen_font, chosen_color=None, doge_highlight_lines=None):
+    try:
+        session_file = os.path.join(BASE_DIR, "scratch", f"session_{user_id}.json")
+        os.makedirs(os.path.dirname(session_file), exist_ok=True)
+        data = {
+            "chosen_font": chosen_font,
+            "chosen_color": chosen_color,
+            "doge_highlight_lines": doge_highlight_lines
+        }
+        with open(session_file, "w") as f:
+            json.dump(data, f)
+        logger.info(f"Saved session for user {user_id}: {data}")
+    except Exception as e:
+        logger.error(f"Failed to save user session: {e}")
+
+def load_user_session(user_id):
+    try:
+        session_file = os.path.join(BASE_DIR, "scratch", f"session_{user_id}.json")
+        if os.path.exists(session_file):
+            with open(session_file, "r") as f:
+                data = json.load(f)
+                logger.info(f"Loaded session for user {user_id}: {data}")
+                return data
+    except Exception as e:
+        logger.error(f"Failed to load user session: {e}")
+    return {}
+
+def restore_session_if_needed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update or not update.effective_user:
+        return
+    user_id = update.effective_user.id
+    if not context.user_data.get("chosen_font"):
+        session = load_user_session(user_id)
+        if session:
+            context.user_data["chosen_font"] = session.get("chosen_font")
+            context.user_data["chosen_color"] = session.get("chosen_color")
+            context.user_data["doge_highlight_lines"] = session.get("doge_highlight_lines")
 
 def fetch_instagram_post(url: str, user_id: int):
     """
@@ -888,14 +930,12 @@ def overlay_png_on_video(video_path: str, png_bytes: bytes, output_path: str, su
 
 # ----------- Telegram Bot Flow -----------
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
-    ContextTypes,
     filters,
 )
 
@@ -945,6 +985,7 @@ async def font_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     
     font_choice = query.data.split(":")[1]
     context.user_data["chosen_font"] = font_choice
+    save_user_session(update.effective_user.id, font_choice, context.user_data.get("chosen_color"), context.user_data.get("doge_highlight_lines"))
     
     display_names = {
         "faith": "Faith (Lilita One)",
@@ -1003,6 +1044,7 @@ async def color_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     color_choice = query.data.split(":")[1]
     context.user_data["chosen_color"] = color_choice
+    save_user_session(update.effective_user.id, context.user_data.get("chosen_font"), color_choice, context.user_data.get("doge_highlight_lines"))
     
     color_names = {
         "yellow": "🟡 Yellow",
@@ -1025,11 +1067,13 @@ async def color_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def change_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle color change after output — re-render with new color if last text exists."""
+    restore_session_if_needed(update, context)
     query = update.callback_query
     await query.answer()
     
     color_choice = query.data.split(":")[1]
     context.user_data["chosen_color"] = color_choice
+    save_user_session(update.effective_user.id, context.user_data.get("chosen_font"), color_choice, context.user_data.get("doge_highlight_lines"))
     
     color_names = {
         "yellow": "🟡 Yellow",
@@ -1140,6 +1184,7 @@ async def change_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def change_font(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Let user change font without restarting."""
+    restore_session_if_needed(update, context)
     query = update.callback_query
     await query.answer()
     
@@ -1204,6 +1249,7 @@ async def clear_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def text_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Generate and send image upon text reception. User stays on the same page."""
+    restore_session_if_needed(update, context)
     text = update.message.text.strip()
     user_id = update.effective_user.id
     font_choice = context.user_data.get("chosen_font", "faith")
@@ -1445,6 +1491,7 @@ async def text_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def doge_highlight_lines_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle receiving number of lines to color for Doge style."""
+    restore_session_if_needed(update, context)
     num_lines_text = update.message.text.strip()
     try:
         num_lines = int(num_lines_text)
@@ -1455,6 +1502,7 @@ async def doge_highlight_lines_received(update: Update, context: ContextTypes.DE
         return STATE_WAITING_DOGE_HIGHLIGHT_LINES
 
     context.user_data["doge_highlight_lines"] = num_lines
+    save_user_session(update.effective_user.id, "doge", context.user_data.get("chosen_color"), num_lines)
     text = context.user_data.get("doge_pending_text", "")
     
     # Clear the pending text
@@ -1941,6 +1989,7 @@ async def color_ocr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def proofread_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the AI proofread accept/ignore actions."""
+    restore_session_if_needed(update, context)
     query = update.callback_query
     await query.answer()
     
@@ -1988,7 +2037,7 @@ async def proofread_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         }
         color_name = color_names.get(color_choice, color_choice.capitalize())
         
-        if font_choice in ("maga", "charlie", "maga_charlie", "faith"):
+        if font_choice in ("maga", "charlie", "maga_charlie", "faith", "doge"):
             keyboard = [
                 [
                     InlineKeyboardButton("🟡 Yellow", callback_data="recolor:yellow"),
@@ -2030,7 +2079,7 @@ async def proofread_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         caption_text = f"✅ **{font_choice.capitalize()}** transparent text box generated with corrected text!"
         
-        if font_choice in ("maga", "charlie", "faith"):
+        if font_choice in ("maga", "charlie", "faith", "doge"):
             image_buffer.name = f"{font_choice}_textbox.png"
             await query.message.reply_document(
                 document=image_buffer,
@@ -2055,6 +2104,7 @@ async def proofread_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def background_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Download the background image or video and overlay the transparent PNG."""
+    restore_session_if_needed(update, context)
     user_id = update.effective_user.id
     png_bytes = context.user_data.get("transparent_png_bytes")
     font_choice = context.user_data.get("chosen_font", "faith")
@@ -2147,6 +2197,7 @@ async def background_received(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def skip_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Skip background overlay and return to text waiting state."""
+    restore_session_if_needed(update, context)
     await update.message.reply_text("✅ Transparent PNG layout kept. Send new text to generate another!")
     return STATE_WAITING_TEXT
 
@@ -2371,6 +2422,7 @@ async def shape2_image_received(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def skip_shape_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Skip shape/cutout (standard overlay)."""
+    restore_session_if_needed(update, context)
     user_id = update.effective_user.id
     png_bytes = context.user_data.get("transparent_png_bytes")
     bg_path = context.user_data.get("temp_bg_path")
@@ -2513,6 +2565,7 @@ async def shape_position_callback(update: Update, context: ContextTypes.DEFAULT_
 
 async def instagram_background_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle choice of using the fetched Instagram media as background."""
+    restore_session_if_needed(update, context)
     query = update.callback_query
     await query.answer()
     
