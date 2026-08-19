@@ -444,8 +444,8 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         
     if font_type.lower() == "doge":
         # Calculate heights of individual stacked boxes
-        box_padding_y = 16
-        gap = 6
+        box_padding_y = 12
+        gap = 2
         total_h = 0
         for i in range(num_lines):
             total_h += line_heights[i] + box_padding_y
@@ -554,8 +554,8 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
     # Draw each line of text (and background boxes for Doge style)
     if font_type.lower() == "doge":
         curr_top = box_y
-        gap = 6
-        box_padding_y = 16
+        gap = 2
+        box_padding_y = 12
         box_outline = (255, 255, 255, 45)
         for i in range(num_lines):
             line = lines[i]
@@ -573,7 +573,7 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
             
             # Center text vertically in this line box
             top_offset = line_bboxes[i][1]
-            text_y = y_top + 8 - top_offset
+            text_y = y_top + 6 - top_offset
             
             bbox = box_draw.textbbox((0, 0), line, font=font)
             left, top, right, bottom = bbox
