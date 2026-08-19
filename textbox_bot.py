@@ -459,7 +459,7 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         line_bboxes.append(bbox)
         
     # Calculate box height
-    if is_maga:
+    if font_type.lower() in ("maga", "charlie", "maga_charlie"):
         line_spacing_multiplier = 0.75
     else:
         line_spacing_multiplier = 0.70
@@ -484,18 +484,7 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
         box_top_padding = padding
         box_bottom_padding = padding
         
-    if font_type.lower() == "doge":
-        # Calculate heights of individual stacked boxes
-        box_padding_y = 6
-        gap = 2
-        total_h = 0
-        for i in range(num_lines):
-            total_h += line_heights[i] + box_padding_y
-            if i < num_lines - 1:
-                total_h += gap
-        box_height = total_h
-    else:
-        box_height = int(total_text_height + box_top_padding + box_bottom_padding)
+    box_height = int(total_text_height + box_top_padding + box_bottom_padding)
     
     start_y = 17
     # Load banner if style is faith
@@ -587,65 +576,32 @@ def generate_textbox_image(text: str, font_type: str, highlight_choice: str = "y
     box_x = (canvas_w - box_width) // 2
     box_coords = [box_x, box_y, box_x + box_width, box_y + box_height]
     
-    if font_type.lower() != "doge":
-        box_draw.rectangle(
-            box_coords,
-            fill=box_bg
-        )
+    box_draw.rectangle(
+        box_coords,
+        fill=box_bg
+    )
     
-    # Draw each line of text (and background boxes for Doge style)
-    if font_type.lower() == "doge":
-        curr_top = box_y
-        gap = 2
-        box_padding_y = 6
-        box_outline = (255, 255, 255, 45)
-        for i in range(num_lines):
-            line = lines[i]
-            font = fonts[i]
-            color = line_colors[i]
+    # Draw each line of text
+    current_y = box_y + box_top_padding - first_line_top_offset
+    for i in range(num_lines):
+        line = lines[i]
+        font = fonts[i]
+        color = line_colors[i]
+        
+        # Use precise bounding box to avoid cutting off the edges
+        bbox = box_draw.textbbox((0, 0), line, font=font)
+        left, top, right, bottom = bbox
+        w = right - left
+        
+        # Center text horizontally using exact bounds
+        x = box_x + padding - left + (target_text_width - w) // 2
+        
+        box_draw.text((x, current_y), line, font=font, fill=color)
+        if i < num_lines - 1:
             h_curr = line_heights[i]
-            box_h = h_curr + box_padding_y
-            
-            y_top = curr_top
-            y_bottom = curr_top + box_h
-            
-            # Draw separate box for this line
-            line_box_coords = [box_x, y_top, box_x + box_width, y_bottom]
-            box_draw.rectangle(line_box_coords, fill=box_bg, outline=box_outline, width=2)
-            
-            # Center text vertically in this line box
-            top_offset = line_bboxes[i][1]
-            text_y = y_top + 3 - top_offset
-            
-            bbox = box_draw.textbbox((0, 0), line, font=font)
-            left, top, right, bottom = bbox
-            w = right - left
-            x = box_x + padding - left + (target_text_width - w) // 2
-            
-            box_draw.text((x, text_y), line, font=font, fill=color)
-            curr_top += box_h + gap
-    else:
-        # Regular text drawing path
-        current_y = box_y + box_top_padding - first_line_top_offset
-        for i in range(num_lines):
-            line = lines[i]
-            font = fonts[i]
-            color = line_colors[i]
-            
-            # Use precise bounding box to avoid cutting off the edges
-            bbox = box_draw.textbbox((0, 0), line, font=font)
-            left, top, right, bottom = bbox
-            w = right - left
-            
-            # Center text horizontally using exact bounds
-            x = box_x + padding - left + (target_text_width - w) // 2
-            
-            box_draw.text((x, current_y), line, font=font, fill=color)
-            if i < num_lines - 1:
-                h_curr = line_heights[i]
-                h_next = line_heights[i+1]
-                step = 0.5 * (1 + line_spacing_multiplier) * h_curr - 0.5 * (1 - line_spacing_multiplier) * h_next
-                current_y += step
+            h_next = line_heights[i+1]
+            step = 0.5 * (1 + line_spacing_multiplier) * h_curr - 0.5 * (1 - line_spacing_multiplier) * h_next
+            current_y += step
         
     # Draw horizontal line and paste supporting PNG if present
     if font_type.lower() in ("maga", "charlie", "faith"):
