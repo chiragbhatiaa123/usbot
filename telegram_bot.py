@@ -40,6 +40,7 @@ from telegram import (
     ReplyKeyboardRemove,
 )
 from telegram.error import NetworkError, TimedOut
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -893,8 +894,16 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     """Run the bot."""
-    # Create application
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    # Create application with resilient network timeouts
+    request = HTTPXRequest(
+        connection_pool_size=16,
+        connect_timeout=30.0,
+        read_timeout=60.0,
+        write_timeout=60.0,
+        pool_timeout=30.0,
+        media_write_timeout=120.0
+    )
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).request(request).build()
     
     # Conversation handler
     conv_handler = ConversationHandler(

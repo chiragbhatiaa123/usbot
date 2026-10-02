@@ -22,7 +22,12 @@ import re
 import json
 import subprocess
 import sys
+import os
 from pathlib import Path
+
+# Ensure virtual env binaries (like yt-dlp) are in PATH
+venv_bin = Path(sys.executable).parent
+os.environ["PATH"] = os.path.pathsep.join([str(venv_bin), os.environ.get("PATH", "")])
 from datetime import datetime
 from typing import Optional
 
@@ -228,12 +233,110 @@ def try_ytdlp_to_dir(url: str, raw_dir: Path) -> bool:
         return False
 
 
+def try_vxinstagram_to_dir(shortcode: str, raw_dir: Path) -> bool:
+    """
+    Attempt to download using vxinstagram or instagram7 proxies when standard downloaders are rate-limited or fail.
+    Returns True on success, False on failure.
+    """
+    import urllib.request
+    import urllib.error
+    import html as html_lib
+    
+    # Custom redirect handler that preserves headers (User-Agent) to prevent 403 on CDN redirects
+    class BindHeadersRedirectHandler(urllib.request.HTTPRedirectHandler):
+        def __init__(self, original_req):
+            self.original_req = original_req
+            super().__init__()
+            
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            new_req = super().redirect_request(req, fp, code, msg, headers, newurl)
+            if new_req is not None:
+                for k, v in self.original_req.headers.items():
+                    new_req.add_header(k, v)
+            return new_req
+            
+    def open_url_preserving_headers(req, timeout=15):
+        opener = urllib.request.build_opener(BindHeadersRedirectHandler(req))
+        return opener.open(req, timeout=timeout)
+    
+    # Try multiple proxy domains for redundancy (prioritize instagram7 for its uncropped offload endpoint)
+    proxy_domains = ["instagram7.com", "vxinstagram.com"]
+    
+    for domain in proxy_domains:
+        # First: Try the direct offload URL to get the uncropped original media (useful for photo posts)
+        offload_url = f"https://{domain}/offload/{shortcode}/1"
+        print(f"Trying direct offload URL for uncropped media: {offload_url}")
+        try:
+            req = urllib.request.Request(
+                offload_url, 
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with open_url_preserving_headers(req, timeout=15) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if "image" in content_type or "video" in content_type:
+                    data = response.read()
+                    if len(data) < 1000:
+                        print(f"Downloaded media too small ({len(data)} bytes), likely placeholder. Skipping offload.")
+                    else:
+                        ext = ".mp4" if "video" in content_type else ".jpg"
+                        dest = raw_dir / f"{shortcode}{ext}"
+                        with open(dest, "wb") as f:
+                            f.write(data)
+                        print(f"Direct offload download succeeded ({domain})! Ext: {ext}, Size: {len(data)} bytes")
+                        return True
+        except Exception as e:
+            print(f"Direct offload failed for {domain}: {e}")
+            
+        # Second: Fallback to HTML scraping
+        for prefix in ("p", "reel"):
+            proxy_url = f"https://{domain}/{prefix}/{shortcode}/"
+            print(f"Querying proxy HTML: {proxy_url}")
+            try:
+                req = urllib.request.Request(
+                    proxy_url, 
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                )
+                with open_url_preserving_headers(req, timeout=15) as response:
+                    html = response.read().decode('utf-8', errors='ignore')
+                    
+                # Search for video first
+                video_match = re.search(r'property="og:video" content="([^"]+)"', html)
+                if video_match:
+                    video_url = html_lib.unescape(video_match.group(1))
+                    print(f"Found video URL via proxy ({domain}): {video_url}")
+                    dest = raw_dir / f"{shortcode}.mp4"
+                    urllib.request.urlretrieve(video_url, dest)
+                    return True
+                    
+                # Fallback to image
+                image_match = re.search(r'property="og:image" content="([^"]+)"', html)
+                if image_match:
+                    image_url = html_lib.unescape(image_match.group(1))
+                    print(f"Found image URL via proxy ({domain}): {image_url}")
+                    dest = raw_dir / f"{shortcode}.jpg"
+                    
+                    # Follow and download from offload CDN
+                    req_img = urllib.request.Request(
+                        image_url,
+                        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                    )
+                    with open_url_preserving_headers(req_img, timeout=15) as img_resp:
+                        with open(dest, "wb") as f:
+                            f.write(img_resp.read())
+                    return True
+                    
+            except Exception as e:
+                print(f"Proxy HTML scrape failed for {domain} with prefix {prefix}: {e}")
+                
+    return False
+
+
 def download_instagram_reel_efficient(url: str, dest_base: str = "workspace") -> Optional[Path]:
     """
     High-level function:
     - picks canonical id (shortcode preferred, else timestamp)
     - ensures workspace/raw exists
-    - tries instaloader -> normalize meta OR tries yt-dlp -> normalize meta
+    - tries instaloader -> normalize meta OR tries yt-dlp -> normalize meta OR tries vxinstagram -> normalize meta
     - returns workspace Path on success, None on failure
     """
     shortcode = extract_shortcode(url)
@@ -257,9 +360,16 @@ def download_instagram_reel_efficient(url: str, dest_base: str = "workspace") ->
         print("Workspace ready (yt-dlp):", workspace)
         return workspace
 
-    # both failed
-    print("Both downloaders failed for URL:", url)
-    # optional cleanup: leave raw dir for debugging or remove if empty
+    # Fall back to vxinstagram proxy
+    if shortcode:
+        ok3 = try_vxinstagram_to_dir(shortcode, raw)
+        if ok3:
+            workspace = normalize_and_write_meta(raw, url, "vxinstagram")
+            print("Workspace ready (vxinstagram):", workspace)
+            return workspace
+
+    # all failed
+    print("All downloaders failed for URL:", url)
     return None
 
 
