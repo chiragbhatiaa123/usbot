@@ -3627,7 +3627,69 @@ def run_test_renders():
         
     logger.info("Test renders complete! You can view the saved images.")
 
+# Dummy / health status web server for Render / Hugging Face / UptimeRobot
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+import time
+
+def start_health_servers():
+    """Start HTTP health servers on PORT, 10000, 8000, and 7860 to ensure instant port binding on Render."""
+    primary_port = int(os.environ.get("PORT", 10000))
+    ports_to_bind = [primary_port]
+    for fallback in [10000, 8000, 7860]:
+        if fallback not in ports_to_bind:
+            ports_to_bind.append(fallback)
+
+    class HealthStatusHandler(SimpleHTTPRequestHandler):
+        def do_GET(self):
+            token_present = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
+            status_text = "Bot Active & Ready" if token_present else "Awaiting TELEGRAM_BOT_TOKEN"
+            html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>US Pages Telegram Bot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+        .card {{ background: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 480px; width: 90%; text-align: center; border: 1px solid #334155; }}
+        h1 {{ color: #38bdf8; margin-top: 0; }}
+        .badge {{ display: inline-block; padding: 0.35rem 0.75rem; border-radius: 9999px; font-weight: 600; font-size: 0.875rem; margin: 0.5rem 0; background: #22c55e20; color: #4ade80; border: 1px solid #22c55e40; }}
+        .badge.warning {{ background: #ef444420; color: #f87171; border: 1px solid #ef444440; }}
+        p {{ color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 Textbox Bot Online</h1>
+        <div><span class="badge {'warning' if not token_present else ''}">Status: {status_text}</span></div>
+        <p>Health check server is actively responding. UptimeRobot pings keep this service awake 24/7 without idle spin-downs.</p>
+    </div>
+</body>
+</html>"""
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.send_header("Content-Length", str(len(html_body.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(html_body.encode("utf-8"))
+
+        def log_message(self, format, *args):
+            pass
+
+    for p in ports_to_bind:
+        def make_server(port_num):
+            try:
+                server = HTTPServer(("0.0.0.0", port_num), HealthStatusHandler)
+                print(f"[HEALTH SERVER] Web server active on 0.0.0.0:{port_num} (ready for Render / UptimeRobot)", flush=True)
+                server.serve_forever()
+            except Exception as ex:
+                pass
+
+        threading.Thread(target=make_server, args=(p,), daemon=True).start()
+
+
 def main():
+    # 1. Start health web servers immediately so Render detects the port in < 1 second
+    start_health_servers()
+
     parser = argparse.ArgumentParser(description="TextBox Telegram Bot")
     parser.add_argument("--test-render", action="store_true", help="Generate test rendering images and exit")
     args = parser.parse_args()
@@ -3639,8 +3701,14 @@ def main():
     # Standard bot run
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
-        logger.error("TELEGRAM_BOT_TOKEN environment variable not set in .env")
-        sys.exit(1)
+        print("[CRITICAL] TELEGRAM_BOT_TOKEN environment variable not set!", flush=True)
+        print("[CRITICAL] Please go to Render Dashboard -> Environment tab and add TELEGRAM_BOT_TOKEN.", flush=True)
+        print("[CRITICAL] Keeping health check web server alive so Render deployment stays UP...", flush=True)
+        while not token:
+            time.sleep(10)
+            token = os.getenv("TELEGRAM_BOT_TOKEN")
+
+    print("[BOT] TELEGRAM_BOT_TOKEN found. Initializing Telegram Bot...", flush=True)
         
     # Download fonts at startup
     download_fonts()
@@ -3728,31 +3796,10 @@ def main():
     
     application.add_handler(conv_handler)
     
-    # Start a dummy web server on port 7860/PORT for Render/Hugging Face startup requirements
-    from http.server import SimpleHTTPRequestHandler, HTTPServer
-    
-    def run_web_server():
-        port = int(os.environ.get("PORT", 7860))
-        class StatusHandler(SimpleHTTPRequestHandler):
-            def do_GET(self):
-                self.send_response(200)
-                self.send_header("Content-type", "text/html")
-                self.end_headers()
-                self.wfile.write(b"<html><body><h1>Textbox Telegram Bot is running!</h1></body></html>")
-            def log_message(self, format, *args):
-                # Silence standard GET request logging to keep Render logs clean
-                pass
-        try:
-            server = HTTPServer(("0.0.0.0", port), StatusHandler)
-            logger.info(f"Starting health status HTTP web server on port {port}...")
-            server.serve_forever()
-        except Exception as ex:
-            logger.error(f"Web server failed to start: {ex}")
-            
-    threading.Thread(target=run_web_server, daemon=True).start()
-    
+    print("[BOT] Starting Textbox Bot polling...", flush=True)
     logger.info("Starting Textbox Bot polling...")
     application.run_polling(allowed_updates=Update.ALL_TYPES, bootstrap_retries=5)
 
 if __name__ == "__main__":
     main()
+

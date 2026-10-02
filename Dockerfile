@@ -28,9 +28,10 @@ COPY . .
 # Create necessary runtime directories and set permissions
 RUN mkdir -p /app/fonts /app/db /app/workspace && chmod -R 777 /app
 
-# Render passes a dynamic port via the PORT environment variable
-# The application binds to it in textbox_bot.py
-EXPOSE 8000
+# Render passes a dynamic port via the PORT environment variable (default 10000)
+# We expose both 10000 and 8000 for standard Docker compatibility
+EXPOSE 10000 8000
 
-# Run the textbox_bot
-CMD ["python", "textbox_bot.py"]
+# Run the textbox_bot with unbuffered output so logs stream immediately
+CMD ["python", "-u", "textbox_bot.py"]
+
