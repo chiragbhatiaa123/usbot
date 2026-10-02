@@ -15,19 +15,78 @@ Features:
 
 import os
 import sys
+import threading
+import time
+from http.server import SimpleHTTPRequestHandler, HTTPServer
+
+def start_health_servers():
+    """Start HTTP health servers on PORT, 10000, 8000, and 7860 to ensure instant port binding on Render."""
+    primary_port = int(os.environ.get("PORT", 10000))
+    ports_to_bind = [primary_port]
+    for fallback in [10000, 8000, 7860]:
+        if fallback not in ports_to_bind:
+            ports_to_bind.append(fallback)
+
+    class HealthStatusHandler(SimpleHTTPRequestHandler):
+        def do_GET(self):
+            token_present = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
+            status_text = "Bot Active & Ready" if token_present else "Awaiting TELEGRAM_BOT_TOKEN"
+            html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>US Pages Telegram Bot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+        .card {{ background: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 480px; width: 90%; text-align: center; border: 1px solid #334155; }}
+        h1 {{ color: #38bdf8; margin-top: 0; }}
+        .badge {{ display: inline-block; padding: 0.35rem 0.75rem; border-radius: 9999px; font-weight: 600; font-size: 0.875rem; margin: 0.5rem 0; background: #22c55e20; color: #4ade80; border: 1px solid #22c55e40; }}
+        .badge.warning {{ background: #ef444420; color: #f87171; border: 1px solid #ef444440; }}
+        p {{ color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 Textbox Bot Online</h1>
+        <div><span class="badge {'warning' if not token_present else ''}">Status: {status_text}</span></div>
+        <p>Health check server is actively responding. UptimeRobot pings keep this service awake 24/7 without idle spin-downs.</p>
+    </div>
+</body>
+</html>"""
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.send_header("Content-Length", str(len(html_body.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(html_body.encode("utf-8"))
+
+        def log_message(self, format, *args):
+            pass
+
+    for p in ports_to_bind:
+        def make_server(port_num):
+            try:
+                server = HTTPServer(("0.0.0.0", port_num), HealthStatusHandler)
+                print(f"[HEALTH SERVER] Instant web server active on 0.0.0.0:{port_num} (ready for Render / UptimeRobot)", flush=True)
+                server.serve_forever()
+            except Exception as ex:
+                pass
+
+        threading.Thread(target=make_server, args=(p,), daemon=True).start()
+
+# Launch health server IMMEDIATELY (in <50ms) before any heavy ML packages are imported
+start_health_servers()
+
 import logging
 import urllib.request
 import argparse
 import asyncio
-import threading
 import base64
 from io import BytesIO
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 import cv2
 import numpy as np
-import onnxruntime as ort
-from rembg import remove, new_session
+# NOTE: rembg and onnxruntime are lazy-loaded on demand to keep baseline memory lean (<100MB)
 import requests
 import instaloader
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -37,6 +96,7 @@ from telegram.error import TimedOut, NetworkError, TelegramError
 # Load environment variables
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 
 import json
 
@@ -53,11 +113,13 @@ def get_rembg_session():
     global REMBG_SESSION
     if REMBG_SESSION is None:
         try:
+            from rembg import new_session
             # Use u2netp (lightweight 4.7MB model, ~35MB RAM) to comfortably fit within 512MB RAM
             REMBG_SESSION = new_session("u2netp")
         except Exception as e:
             logger.error(f"Failed to create rembg session: {e}")
     return REMBG_SESSION
+
 
 
 CUTOUT_CACHE = {}
@@ -128,6 +190,7 @@ def compute_and_cache_cutout(bg_image_path: str, target_h: int):
         bg_img = Image.open(bg_image_path).convert("RGBA")
         bg_enhanced = enhance_image_quality(bg_img)
         session = get_rembg_session()
+        from rembg import remove
         cutout = remove(bg_enhanced, session=session)
         bg_aspect = bg_enhanced.width / bg_enhanced.height
         target_aspect = 1080 / target_h
@@ -3640,69 +3703,7 @@ def run_test_renders():
         
     logger.info("Test renders complete! You can view the saved images.")
 
-# Dummy / health status web server for Render / Hugging Face / UptimeRobot
-from http.server import SimpleHTTPRequestHandler, HTTPServer
-import time
-
-def start_health_servers():
-    """Start HTTP health servers on PORT, 10000, 8000, and 7860 to ensure instant port binding on Render."""
-    primary_port = int(os.environ.get("PORT", 10000))
-    ports_to_bind = [primary_port]
-    for fallback in [10000, 8000, 7860]:
-        if fallback not in ports_to_bind:
-            ports_to_bind.append(fallback)
-
-    class HealthStatusHandler(SimpleHTTPRequestHandler):
-        def do_GET(self):
-            token_present = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
-            status_text = "Bot Active & Ready" if token_present else "Awaiting TELEGRAM_BOT_TOKEN"
-            html_body = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>US Pages Telegram Bot</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-        .card {{ background: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 480px; width: 90%; text-align: center; border: 1px solid #334155; }}
-        h1 {{ color: #38bdf8; margin-top: 0; }}
-        .badge {{ display: inline-block; padding: 0.35rem 0.75rem; border-radius: 9999px; font-weight: 600; font-size: 0.875rem; margin: 0.5rem 0; background: #22c55e20; color: #4ade80; border: 1px solid #22c55e40; }}
-        .badge.warning {{ background: #ef444420; color: #f87171; border: 1px solid #ef444440; }}
-        p {{ color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }}
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>🤖 Textbox Bot Online</h1>
-        <div><span class="badge {'warning' if not token_present else ''}">Status: {status_text}</span></div>
-        <p>Health check server is actively responding. UptimeRobot pings keep this service awake 24/7 without idle spin-downs.</p>
-    </div>
-</body>
-</html>"""
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.send_header("Content-Length", str(len(html_body.encode("utf-8"))))
-            self.end_headers()
-            self.wfile.write(html_body.encode("utf-8"))
-
-        def log_message(self, format, *args):
-            pass
-
-    for p in ports_to_bind:
-        def make_server(port_num):
-            try:
-                server = HTTPServer(("0.0.0.0", port_num), HealthStatusHandler)
-                print(f"[HEALTH SERVER] Web server active on 0.0.0.0:{port_num} (ready for Render / UptimeRobot)", flush=True)
-                server.serve_forever()
-            except Exception as ex:
-                pass
-
-        threading.Thread(target=make_server, args=(p,), daemon=True).start()
-
-
 def main():
-    # 1. Start health web servers immediately so Render detects the port in < 1 second
-    start_health_servers()
-
     parser = argparse.ArgumentParser(description="TextBox Telegram Bot")
     parser.add_argument("--test-render", action="store_true", help="Generate test rendering images and exit")
     args = parser.parse_args()
