@@ -53,10 +53,12 @@ def get_rembg_session():
     global REMBG_SESSION
     if REMBG_SESSION is None:
         try:
-            REMBG_SESSION = new_session("u2net")
+            # Use u2netp (lightweight 4.7MB model, ~35MB RAM) to comfortably fit within 512MB RAM
+            REMBG_SESSION = new_session("u2netp")
         except Exception as e:
             logger.error(f"Failed to create rembg session: {e}")
     return REMBG_SESSION
+
 
 CUTOUT_CACHE = {}
 BG_CROPPED_CACHE = {}
@@ -325,6 +327,10 @@ REALESRGAN_SESSION = None
 def get_realesrgan_session():
     """Get or lazily initialize the Real-ESRGAN ONNX session for AI super-resolution."""
     global REALESRGAN_SESSION
+    # On Render free tier (512MB RAM), skip heavy ONNX deep learning model to prevent OOM kills
+    if os.environ.get("RENDER") or os.environ.get("LOW_MEMORY"):
+        return None
+
     if REALESRGAN_SESSION is None:
         model_paths = [
             os.path.join(BASE_DIR, "resources", "RealESRGAN_x4plus.onnx"),
@@ -338,15 +344,22 @@ def get_realesrgan_session():
             providers.append("CoreMLExecutionProvider")
         providers.append("CPUExecutionProvider")
 
+        sess_opts = ort.SessionOptions()
+        sess_opts.enable_cpu_mem_arena = False
+        sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        sess_opts.intra_op_num_threads = 1
+        sess_opts.inter_op_num_threads = 1
+
         for mp in model_paths:
             if os.path.exists(mp):
                 try:
-                    REALESRGAN_SESSION = ort.InferenceSession(mp, providers=providers)
+                    REALESRGAN_SESSION = ort.InferenceSession(mp, sess_options=sess_opts, providers=providers)
                     logger.info(f"Loaded Real-ESRGAN AI model from: {mp} with providers {providers}")
                     break
                 except Exception as e:
                     logger.error(f"Failed to load Real-ESRGAN model from {mp}: {e}")
     return REALESRGAN_SESSION
+
 
 def enhance_image_quality(img: Image.Image, target_size: tuple = None) -> Image.Image:
     """
@@ -3712,10 +3725,6 @@ def main():
         
     # Download fonts at startup
     download_fonts()
-    
-    # Pre-warm rembg ONNX session and Real-ESRGAN AI model in background threads
-    threading.Thread(target=get_rembg_session, daemon=True).start()
-    threading.Thread(target=get_realesrgan_session, daemon=True).start()
     
     # Configure resilient HTTP request timeouts to prevent "Timed out" errors during media rendering/uploading
     request = HTTPXRequest(
